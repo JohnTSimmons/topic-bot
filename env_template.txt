@@ -1,0 +1,16 @@
+#Template for the .env file so I didn't have to make it every time.
+#Fill in the TOKEN and GUILD fields so the bot will work.
+#save as .env
+
+#Our discord bot token, do not share this with anyone!
+TOKEN =
+#Our guild ID we want the bot to interact with.
+GUILD =
+
+#Day of the week to post our weekly automated posts.
+#The bot will post at noon CST.
+#0 is monday, 6 is sunday
+DAY = 6
+
+#Name of the role for the admin commands.
+ROLE = Admin
