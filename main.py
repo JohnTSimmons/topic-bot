@@ -20,19 +20,19 @@ bot = discord.Bot(intents = intents, allowed_mentions = discord.AllowedMentions(
 @bot.event
 async def on_ready():
     print(f"{bot.user} is ready and online!")
-    PostOnDay()
+    post_scheduler.datechecker.start()
 
 @bot.slash_command(name = "hello", description = "Say hello to me!")
 async def hello(ctx):
     await ctx.respond("Hey! :slight_smile:")
-    
+
 @bot.slash_command(name = "add_topic", description = "Submit a topic for the weekly topic!")
 async def submit_topic(ctx, topic: Option(str, "Enter your message!", required = True)):
     content = topic
     author = ctx.author
     await submit_topic_into_db(content, author)
     await ctx.respond("Added topic! :white_check_mark:")
-    
+
 @bot.slash_command(name = "new_topic", description = "Force the bot to post a new topic, admin only.")
 async def post_new_topic(ctx):
     admin_role = discord.utils.get(ctx.guild.roles, name = admin_role_tag)
@@ -42,18 +42,26 @@ async def post_new_topic(ctx):
     else:
         await ctx.respond("You are not admin!")
 
+@bot.slash_command(name = "time", description = "Debug for post scheduler.")
+async def get_time(ctx):
+    await ctx.channel.send("The current time is: " + str(datetime.datetime.utcnow().time()))
+    await ctx.channel.send("The next task fire time is : " + str(post_scheduler.datechecker.next_iteration))
+    await ctx.channel.send("The scheduler is set to fire at: " + str(post_scheduler.datechecker.time))
+    await ctx.channel.send("Running? : " + str(post_scheduler.datechecker.is_running()))
+    await ctx.respond(":white_check_mark: (All times UTC)")
+
 class PostOnDay(commands.Cog):
-    def __init__(self):
-        self.datechecker.start()
-    
+    def __init__(self, bot):
+        self.bot = bot
+
     def cog_unload(self):
         self.datechecker.cancel()
-    
+
     async def post(self):
         await post_progress_report()
         await post_topic_of_the_week()
-    
-    @tasks.loop(time= datetime.time(6, 00)) #Should be 6, 00 for noon CST
+
+    @tasks.loop(time = datetime.time(20, 00)) #20 UTC corresponds to 2:00 PM CST, TODO: need to make this an env variable.
     async def datechecker(self):
         now = datetime.datetime.now()
         weekday = now.weekday()
@@ -62,7 +70,13 @@ class PostOnDay(commands.Cog):
             await self.post()
         else:
             print("Not the correct day to post.")
-            
+
+    @datechecker.before_loop
+    async def before_datechecker(self):
+        print("Waiting...")
+        await self.bot.wait_until_ready()
+        print("Datechecker loop started.")
+
 async def submit_topic_into_db(content, author):
     data = (str(content), str(author), "False")
     async with aiosqlite.connect("topic_database.db") as db:
@@ -99,6 +113,8 @@ async def post_topic_of_the_week():
     topic = await get_topic()
     await channel.send(topic[1] + " asked: ")
     await channel.send(topic[0])
+
+post_scheduler = PostOnDay(bot)
 
 if __name__ == '__main__':
     bot.run(os.getenv('TOKEN'))
